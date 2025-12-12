@@ -27,7 +27,7 @@ clear all;% clf
 %warning('error', 'MATLAB:divideByZero');
 
 % Database | Hydration mol frac | + Hydration anomaly | + temp anomaly
-nname ='Venera14_0.1_0.03_300_';  % mat filename
+nname ='VENERA-14_0.09_0.03_300_';  % mat filename
 timestep=0;
 % Load mat file
 fdata=fopen('file.txt','rt');
@@ -307,7 +307,7 @@ for jm = 1:1:Nxm
             tm(m)        = 1;
             tkm(m)       = tktop + ((ym(m)-5000)/20000)*100;
             phim(m)      = phim0;
-            XHtotalm(m)  = 0.1;
+            XHtotalm(m)  = 0.09;
             etasolidm(m) = 1e21;
         end
                 
@@ -444,11 +444,11 @@ titermax=200; % Maximal number of global iterations
 titermax1=20; % Maximal initial number of global iterations
 titerstep1=5; % Number of timesteps for initial number of global iterations 
 timestep=1;
-savefigstep=100;  % .jpeg storage periodicity
+savefigstep=50;  % .jpeg storage periodicity
 savematstep=50;  % .mat storage periodicity
 % pause(100)
 end
-desktopyn=0; % Figures y(1)/n(0)
+desktopyn=1; % Figures y(1)/n(0)
 for timestep=timestep:1:1000000
 
 % Save old Ptotal for HA
@@ -2630,114 +2630,6 @@ for i1=2:1:Ny
     % Compute nodal old total pressure
     PT0(i1,j1)=pr(i,j)*wtmij+pr(i+1,j)*wtmi1j+...
             pr(i,j+1)*wtmij1+pr(i+1,j+1)*wtmi1j1;
-
-    % Backtracing node with fluid velocity
-    xcur=xp(j1);
-    ycur=yp(i1);
-    xA=xcur;
-    yA=ycur;
-    for rk=1:1:4
-        % Interpolate vx
-        j=fix((xcur-xvx(1))/dx)+1;
-        i=fix((ycur-yvx(1))/dy)+1;
-        % Normalized marker distances
-        dxmj=(xcur-xvx(j));
-        dymi=(ycur-yvx(i));
-        % Compute weights
-        wtmij=(1-dxmj/dx)*(1-dymi/dy);
-        wtmi1j=(1-dxmj/dx)*(dymi/dy);
-        wtmij1=(dxmj/dx)*(1-dymi/dy);
-        wtmi1j1=(dxmj/dx)*(dymi/dy);
-        % Compute marker vx
-        vxm(rk)=vxf(i,j)*wtmij+vxf(i+1,j)*wtmi1j+vxf(i,j+1)*wtmij1+vxf(i+1,j+1)*wtmi1j1;
-        % Compute correction
-        dvxmcorr=0;
-        if(dxmj/dx>=0.5)
-            if(j<Nx-1)
-                dvxmcorr=1/2*((dxmj/dx-0.5)^2)*...
-                     ((1-dymi/dy)*(vxf(i,j)-2*vxf(i,j+1)+vxf(i,j+2))+...
-                     (dymi/dy)*(vxf(i+1,j)-2*vxf(i+1,j+1)+vxf(i+1,j+2)));
-            end
-        else
-            if(j>1)
-                dvxmcorr=1/2*((dxmj/dx-0.5)^2)*...
-                    ((1-dymi/dy)*(vxf(i,j-1)-2*vxf(i,j)+vxf(i,j+1))+...
-                     (dymi/dy)*(vxf(i+1,j-1)-2*vxf(i+1,j)+vxf(i+1,j+1)));
-            end
-        end
-        % dvxmcorr=0;
-        vxm(rk)=vxm(rk)+dvxmcorr;
-        
-        % Interpolate vy
-        j=fix((xcur-xvy(1))/dx)+1;
-        i=fix((ycur-yvy(1))/dy)+1;
-        % Normalized marker distances
-        dxmj=(xcur-xvy(j));
-        dymi=(ycur-yvy(i));
-        % Compute weights
-        wtmij=(1-dxmj/dx)*(1-dymi/dy);
-        wtmi1j=(1-dxmj/dx)*(dymi/dy);
-        wtmij1=(dxmj/dx)*(1-dymi/dy);
-        wtmi1j1=(dxmj/dx)*(dymi/dy);
-        % Compute marker vy
-        vym(rk)=vyf(i,j)*wtmij+vyf(i+1,j)*wtmi1j+vyf(i,j+1)*wtmij1+vyf(i+1,j+1)*wtmi1j1;
-        dvymcorr=0;
-        if(dymi/dy>=0.5)
-            if(i<Ny-1)
-                dvymcorr=1/2*((dymi/dy-0.5)^2)*...
-                    ((1-dxmj/dx)*(vyf(i,j)-2*vyf(i+1,j)+vyf(i+2,j))+...
-                     (dxmj/dx)*(vyf(i,j+1)-2*vyf(i+1,j+1)+vyf(i+2,j+1)));
-            end      
-        else
-            if(i>1)
-                dvymcorr=1/2*((dymi/dy-0.5)^2)*...
-                    ((1-dxmj/dx)*(vyf(i-1,j)-2*vyf(i,j)+vyf(i+1,j))+...
-                    (dxmj/dx)*(vyf(i-1,j+1)-2*vyf(i,j+1)+vyf(i+1,j+1)));
-            end
-        end
-        % dvymcorr=0;
-        vym(rk)=vym(rk)+dvymcorr;
-        
-        % Change coordinates to obtain B,C,D points
-        if(rk==1 || rk==2)
-            xcur=xA-dt/2*vxm(rk);
-            ycur=yA-dt/2*vym(rk);
-        elseif(rk==3)
-            xcur=xA-dt*vxm(rk);
-            ycur=yA-dt*vym(rk);
-        end
-    end
-    % Compute effective velocity
-    vxmeff=1/6*(vxm(1)+2*vxm(2)+2*vxm(3)+vxm(4));
-    vymeff=1/6*(vym(1)+2*vym(2)+2*vym(3)+vym(4));
-    % Trace the node backward
-    xcur=xA-dt*vxmeff;
-    ycur=yA-dt*vymeff;
-    % Interpolate fluid temperature
-    % Define i,j indexes for the upper left node
-    j=fix((xcur-xp(1))/dx)+1;
-    i=fix((ycur-yp(1))/dy)+1;
-    if(j<1)
-        j=1;
-    elseif(j>Nx)
-        j=Nx;
-    end
-    if(i<1)
-        i=1;
-    elseif(i>Ny)
-        i=Ny;
-    end
-    % Compute distances
-    dxmj=xcur-xp(j);
-    dymi=ycur-yp(i);
-    % Compute weights
-    wtmij=(1-dxmj/dx)*(1-dymi/dy);
-    wtmi1j=(1-dxmj/dx)*(dymi/dy);    
-    wtmij1=(dxmj/dx)*(1-dymi/dy);
-    wtmi1j1=(dxmj/dx)*(dymi/dy);
-    % Compute nodal old fluid pressure
-    PF0(i1,j1)=pf(i,j)*wtmij+pf(i+1,j)*wtmi1j+...
-            pf(i,j+1)*wtmij1+pf(i+1,j+1)*wtmi1j1;
 end
 end
 
@@ -2888,175 +2780,6 @@ marknumnew=marknum;
 
 % Update timesum
 timesum=timesum+dt;
-
-
-
-% Save image
-if(timestep==5 || fix(timestep/savefigstep)*savefigstep==timestep)
-    figure('Visible', 'off', 'Position', [100, 100, 1500, 1200]);
-    colormap('Jet');
-    clf;
-
-    subplot(4,5,1)
-    pcolor(x/1000,y/1000,log10(ETA));% caxis([17 21])
-    shading flat;
-    axis ij image;
-    colorbar
-    title(['logETA,Pa*s timestep=',num2str(timestep)])
-    hold on
-    quiver(xp(3:5:Nx1)/1000,yp(3:5:Ny1)/1000,vxp(3:5:Ny,3:5:Nx1),vyp(3:5:Ny1,3:5:Nx1),'w')
-
-    subplot(4,5,2)
-    pcolor(xp/1000,yp/1000,pr)
-    shading interp;
-    axis ij image;
-    colorbar
-    title(['Ptotal,Pa time(My)=',num2str(timesum/1e+6/(365.25*24*3600))])
-    hold on
-    quiver(xp(3:5:Nx1)/1000,yp(3:5:Ny1)/1000,vxp(3:5:Ny,3:5:Nx1),vyp(3:5:Ny1,3:5:Nx1),'k')
-
-    subplot(4,5,3)
-    pcolor(xvx/1000,yvx/1000,vx)
-    shading interp;
-    axis ij image;
-    colorbar
-    title('vx, m/s')
-    title(['vx,m/s dt(y)=',num2str(dt/(365.25*24*3600))])
-    hold on
-    quiver(xp(3:5:Nx1)/1000,yp(3:5:Ny1)/1000,vxp(3:5:Ny,3:5:Nx1),vyp(3:5:Ny1,3:5:Nx1),'k')
-
-    subplot(4,5,4)
-    pcolor(xvy/1000,yvy/1000,vy)
-    shading interp;
-    axis ij image;
-    colorbar
-    title('vy, m/s')
-    title(['vy, m/s iter=',num2str(titer)])
-    hold on
-    quiver(xp(3:5:Nx1)/1000,yp(3:5:Ny1)/1000,vxp(3:5:Ny,3:5:Nx1),vyp(3:5:Ny1,3:5:Nx1),'k')
-
-    subplot(4,5,5)
-    pcolor(xp/1000,yp/1000,HS)
-    shading interp;
-    axis ij image;
-    colorbar
-    title('HS, W/m^3')
-
-    subplot(4,5,6)
-    pcolor(xp/1000,yp/1000,log10(1./(ETAPHI+1e-30)))
-    shading interp;
-    axis ij image;
-    colorbar
-    title('logETAphi, Pa*s')
-
-    subplot(4,5,7)
-    pcolor(xp/1000,yp/1000,RHO)
-    shading interp;
-    axis ij image;
-    colorbar
-    title('RHOtotal, kg/m^3')
-
-    subplot(4,5,8)
-    pcolor(xvx/1000,yvx/1000,log10(KX))
-    shading interp;
-    axis ij image;
-    colorbar
-    title('logK, W/m/K')
-
-    subplot(4,5,9)
-    pcolor(xp/1000,yp/1000,tk2)
-    shading interp;
-    axis ij image;
-    colorbar
-    title('T, K')
-
-    subplot(4,5,10)
-    pcolor(xp/1000,yp/1000,PHI)
-    shading interp;
-    axis ij image;
-    colorbar
-    title('PHI')
-
-    subplot(4,5,11)
-    pcolor(xp/1000,yp/1000,pr-pf)
-    shading interp;
-    axis ij image;
-    colorbar
-    title('Ptotal-Pfluid, Pa')
-
-    subplot(4,5,12)
-    pcolor(xvx/1000,yvx/1000,vxf)
-    shading interp;
-    axis ij image;
-    colorbar
-    title('Vxfluid, m/s')
-
-
-    subplot(4,5,13)
-    pcolor(xvy/1000,yvy/1000,vyf)
-    shading interp;
-    axis ij image;
-    colorbar
-    title('VyFluid, m/s')
-
-    subplot(4,5,14)
-    pcolor(xvx/1000,yvx/1000,XHT)
-    shading interp;
-    axis ij image;
-    colorbar
-    title('XHT')
-
-
-    subplot(4,5,15)
-    pcolor(xp/1000,yp/1000,XHS)
-    shading interp;
-    axis ij image;
-    colorbar
-    title('XHS')
-
-    subplot(4,5,16)
-    pcolor(xp/1000,yp/1000, ALPHA)
-    shading interp;
-    axis ij image;
-    colorbar
-    title(' ALPHA, 1/K')
-
-
-    subplot(4,5,17)
-    pcolor(xp/1000,yp/1000, ALPHAFLUID)
-    shading interp;
-    axis ij image;
-    colorbar
-    title('ALPHA FLUID, 1/K')
-
-    subplot(4,5,18)
-    pcolor(xp/1000,yp/1000, ALPHASOLID)
-    shading interp;
-    axis ij image;
-    colorbar
-    title('ALPHA SOLID, 1/K')
-
-    subplot(4,5,19)
-    pcolor(xxm/1000,yym/1000,mtyp)
-    shading flat;
-    axis ij image;
-    colorbar
-    title('Rock type')
-
-    subplot(4,5,20)
-    pcolor(xxm/1000,yym/1000,mpor)
-    shading flat;
-    axis ij image;
-    colorbar
-    title('porosity')
-
-
-    namejpg = fullfile(output_dir, [nname, num2str(timestep), '.jpg']);
-    print('-djpeg', '-r300', namejpg);
-end
-
-
-
 
 
 if(desktopyn==1)
