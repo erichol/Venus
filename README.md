@@ -5,7 +5,7 @@ Code for the MSc thesis *(Thesis_EricHolenstein_final.pdf)*: a 2D hydro-thermo-m
 ## Pipeline
 
 ```
-extractor/extractor.jl  →  table_<name>.dat  →  extractor/dat_to_mat.m  →  databases/database_<name>.mat  →  HTMC_venus.m
+extractor/extractor.jl  →  table_<name>.dat  →  extractor/dat_to_mat.m  →  databases/database_<name>.mat  →  HTMC.m
       (Julia, MAGEMin)                              (MATLAB)                                                  (MATLAB)
 ```
 
@@ -15,13 +15,13 @@ You only need steps 1–2 to build a new composition or grid. The six databases 
 
 | Path | What it is |
 |---|---|
-| `HTMC_venus.m` | Main model: staggered-grid finite differences with marker-in-cell, coupled solid–fluid flow, energy equation, hydration |
+| `HTMC.m` | Main model: staggered-grid finite differences with marker-in-cell, coupled solid–fluid flow, energy equation, hydration |
 | `databases/database_<name>.mat` | P–T–H₂O lookup tables, one per composition (VEGA, VEGA-2, VBasalt, Venera-13, Venera-14, BSE) |
 | `extractor/extractor.jl` | Runs MAGEMin (`ume` database) over a P–T–H₂O grid. It computes solid, fluid (Pitzer & Sterner 1994 EoS) and system density, enthalpy, α, β, c_p and bound water |
-| `extractor/dat_to_mat.m` | Converts `table_<name>.dat` into the 3D arrays (`np × nt × nwt`) that `HTMC_venus.m` loads |
+| `extractor/dat_to_mat.m` | Converts `table_<name>.dat` into the 3D arrays (`np × nt × nwt`) that `HTMC.m` loads |
 | `extractor/plot_hydration.jl` | 3D scatter (plus a spinning GIF) of where free water exists in a database |
 | `hydration_plots/` | Output of `plot_hydration.jl` for each composition |
-| `file.txt` | Restart counter used by `HTMC_venus.m` (see below) |
+| `file.txt` | Restart counter used by `HTMC.m` (see below) |
 
 ## 1. Generate a table (Julia)
 
@@ -54,18 +54,18 @@ In `dat_to_mat.m`, set `data_name = '<name>'`, then run it next to the `.dat` fi
 Run from the repo root:
 
 ```matlab
->> HTMC_venus
+>> HTMC
 ```
 
 ### Tweakable parameters
 
-Everything you set is in the setup block, roughly lines 1–450 of `HTMC_venus.m`. The tables go in file order.
+Everything you set is in the setup block, roughly lines 1–450 of `HTMC.m`. The tables go in file order.
 
 **Run & composition**
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `nname` | `'VENERA-14_0.09_0.03_300_'` | Prefix for output files. Convention: `<db>_<XH>_<dXH>_<dT>_` |
+| `nname` | `'VENERA-14_0.09_0.03_300_'` (not updated to the current values) | Prefix for output files. Convention: `<db>_<XH>_<dXH>_<dT>_` |
 | `Venus_composition` | `5` | 1 VEGA, 2 VEGA-2, 3 VBasalt, 4 Venera-13, 5 Venera-14, 6 BSE. Picks the database and the oxide composition `X_Venus_wt` |
 
 **Geometry & resolution**
@@ -93,7 +93,7 @@ Everything you set is in the setup block, roughly lines 1–450 of `HTMC_venus.m
 | Variable | Default | Meaning |
 |---|---|---|
 | `tktop` | 740 K | Surface temperature |
-| `ptop` | 95.6 bar | Surface pressure |
+| `ptop`, `psurf` | 67.53 bar, 95.6 bar | Pressure at the top of the sticky air (5 km above the surface) and at the surface |
 | `bcleft/right/top/bottom` | `-1` | Solid velocity BC: −1 free slip, 1 no slip |
 | `bcf*` | `-1` | Fluid velocity BC: −1 free slip, 1 no slip |
 
@@ -103,13 +103,13 @@ Everything you set is in the setup block, roughly lines 1–450 of `HTMC_venus.m
 |---|---|---|
 | Sticky air | `ym < 5000` | Top 5 km is air (type 4) |
 | Crust temperature | `tktop + ((ym-5000)/20000)*100` | Linear profile, 740 → 840 K |
-| `XHtotalm` | `0.09` | Initial bulk water (mol fraction) in the crust |
+| `XHtotalm` | `0.02` | Initial bulk water (mol fraction) in the crust |
 | `etasolidm` | 1e21 crust, 1e17 air | Initial viscosity |
 | `an_width_x/y` | 30 km, 20 km | Size of the Gaussian anomaly |
-| `an_x_center`, `an_y_center` | `xsize/2`, `ysize` | Anomaly centre: horizontally centred, at the bottom |
-| `an_dT_gauss` | 300 K | Temperature added inside the anomaly |
-| `an_dXH_gauss` | 0.03 | Water added inside the anomaly |
-| `an_G > 0.15` | | Threshold for which markers count as anomaly (type 2) |
+| `an_x_center`, `an_y_center` | `xsize/2`, `0.9*ysize` | Anomaly centre: horizontally centred, near the bottom |
+| `an_dT_gauss` | 300 K | Peak temperature added, scaled by the Gaussian `an_G` (smooth, no sharp edge) |
+| `an_dXH_gauss` | 0.04 | Peak water added, scaled by `an_G` |
+| `an_G > 0.2` | | Threshold for which markers count as anomaly (type 2) |
 
 **Timestepping & output**
 
@@ -117,9 +117,10 @@ Everything you set is in the setup block, roughly lines 1–450 of `HTMC_venus.m
 |---|---|---|
 | `dt`, `dtkoef` | 1e10 s, 1.2 | Initial timestep and its growth factor |
 | `dxymax`, `DTmax`, `dphimax` | 0.1, 20 K, 0.01 | Timestep limits: marker displacement (grid steps), temperature change, porosity change |
+| `dnfmax` | 100 mol/m³ | Timestep limit: max change in free water per step (set in the time loop, ~line 1656) |
 | `titermax`, `pferrmax` | 200, 1e4 Pa | Max iterations and convergence tolerance |
 | `savefigstep`, `savematstep` | 50, 50 | How often to save `.jpg` and `.mat` |
-| `desktopyn` | 1 | Show figures (1) or not (0) |
+| `desktopyn` | 0 | Show figures (1) or not (0) |
 
 Notes:
 - **Hard-coded geometry:** the 5 km air layer, the `20000` and the `100` in the temperature profile are written as numbers, not derived from other variables. If you change `ysize` or want a different bottom temperature, edit them too. `tkbottom` is recomputed from the initial profile, so setting it has no effect.
